@@ -9,13 +9,13 @@ import {
   deleteBooking,
   getAvailableSlots,
 } from "../controllers/bookingController.js";
-import { protect, authorize } from "../middleware/auth.js";
+import { protect, authorize, optionalAuth } from "../middleware/auth.js";
 
 // Public route - check available slots
 router.get("/available-slots/:date", getAvailableSlots);
 
-// Protected route - must be logged in to create booking
-router.post("/", protect, createBooking);
+// Allow booking with or without authentication (guest bookings)
+router.post("/", optionalAuth, createBooking);
 
 // Protected routes
 router.get("/", protect, authorize("admin"), getAllBookings);

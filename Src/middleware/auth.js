@@ -48,6 +48,41 @@ export const protect = async (req, res, next) => {
   }
 };
 
+// Optional authentication - attach user if token exists but don't require it
+export const optionalAuth = async (req, res, next) => {
+  let token;
+
+  // Check for token in cookies (primary method)
+  if (req.cookies.token) {
+    token = req.cookies.token;
+  }
+  // Fallback: Check for token in Authorization header
+  else if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    token = req.headers.authorization.split(" ")[1];
+  }
+
+  // If no token, continue without user
+  if (!token) {
+    return next();
+  }
+
+  try {
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Get user from token
+    req.user = await User.findById(decoded.id).select("-password");
+  } catch (error) {
+    // Token invalid, continue without user
+    console.log("Optional auth - invalid token:", error.message);
+  }
+
+  next();
+};
+
 // Authorize roles
 export const authorize = (...roles) => {
   return (req, res, next) => {

@@ -55,6 +55,16 @@ import bookingsRoutes from "./Src/routes/bookings.js";
 import adminRoutes from "./Src/routes/admin.js";
 import servicesRoutes from "./Src/routes/services.js";
 
+// Root API endpoint
+app.get("/api", (req, res) => {
+  res.json({
+    status: "OK",
+    message: "AquaFlow Booking API is running",
+    version: "1.0.0",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/admin-auth", adminAuthRoutes);
 app.use("/api/bookings", bookingsRoutes);
