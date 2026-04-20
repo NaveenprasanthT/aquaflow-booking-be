@@ -1,11 +1,6 @@
 import Booking from "../models/Booking.js";
 import User from "../models/User.js";
-
-// Service pricing (matching frontend)
-const servicePrices = {
-  "car-5-seater": 25,
-  "car-7-seater": 35,
-};
+import ServiceItem from "../models/ServiceItem.js";
 
 const addOnPrices = {
   "foam-wash": 15,
@@ -15,8 +10,23 @@ const addOnPrices = {
 };
 
 // Calculate total price
-const calculatePrice = (serviceType, addOns = []) => {
-  let total = servicePrices[serviceType] || 0;
+const calculatePrice = async (serviceType, addOns = []) => {
+  const [serviceFor, ...serviceTypeParts] = String(serviceType || "").split(
+    "-",
+  );
+  const rawServiceType = serviceTypeParts.join("-");
+
+  const service = await ServiceItem.findOne({
+    serviceFor,
+    serviceType: rawServiceType,
+    isActive: true,
+  });
+
+  if (!service) {
+    return null;
+  }
+
+  let total = service.price;
 
   addOns.forEach((addOn) => {
     total += addOnPrices[addOn] || 0;
@@ -91,8 +101,15 @@ export const createBooking = async (req, res, next) => {
       });
     }
 
-    // Calculate total price
-    const totalPrice = calculatePrice(serviceType, addOns || []);
+    // Calculate total price using dynamic service pricing
+    const totalPrice = await calculatePrice(serviceType, addOns || []);
+
+    if (totalPrice === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid service type",
+      });
+    }
 
     // Create booking
     const booking = await Booking.create({

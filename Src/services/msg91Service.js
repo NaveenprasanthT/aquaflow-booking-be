@@ -6,13 +6,30 @@ const formatIndianMobile = (phone) => {
   return digitsOnly;
 };
 
+const isPlaceholderConfig = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  if (!normalized) {
+    return true;
+  }
+
+  return (
+    normalized.includes("your_") ||
+    normalized.includes("template_id") ||
+    normalized.includes("auth_key") ||
+    normalized.includes("changeme")
+  );
+};
+
 export const sendOtpViaMsg91 = async ({ phone, otp }) => {
   const authKey = process.env.MSG91_AUTH_KEY;
   const templateId = process.env.MSG91_TEMPLATE_ID;
   const mobile = formatIndianMobile(phone);
   const otpExpiryMinutes = 5;
 
-  if (!authKey || !templateId) {
+  if (isPlaceholderConfig(authKey) || isPlaceholderConfig(templateId)) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("MSG91 is not configured");
     }
