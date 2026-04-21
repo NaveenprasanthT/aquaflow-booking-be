@@ -2,6 +2,15 @@ import Booking from "../models/Booking.js";
 import User from "../models/User.js";
 import ServiceItem from "../models/ServiceItem.js";
 
+const DAILY_BOOKING_LIMIT = 8;
+
+const getDailyBookingCount = async (date) => {
+  return Booking.countDocuments({
+    date,
+    status: { $ne: "cancelled" },
+  });
+};
+
 const addOnPrices = {
   "foam-wash": 15,
   "pressure-wash": 20,
@@ -55,14 +64,20 @@ export const getAvailableSlots = async (req, res, next) => {
       status: { $ne: "cancelled" },
     }).select("timeSlot");
 
+    const dailyCount = bookedSlots.length;
+
     // Extract just the time slot strings
     const bookedTimeSlots = bookedSlots.map((booking) => booking.timeSlot);
 
+    console.log("API Hit");
     res.status(200).json({
       success: true,
       data: {
         date,
         bookedSlots: bookedTimeSlots,
+        dailyCount,
+        dailyLimit: DAILY_BOOKING_LIMIT,
+        isFullyBooked: dailyCount >= DAILY_BOOKING_LIMIT,
       },
     });
   } catch (error) {
@@ -86,18 +101,12 @@ export const createBooking = async (req, res, next) => {
       });
     }
 
-    // Check if time slot is already booked for this date
-    const existingBooking = await Booking.findOne({
-      date,
-      timeSlot,
-      status: { $ne: "cancelled" }, // Exclude cancelled bookings
-    });
-
-    if (existingBooking) {
+    // Enforce daily booking limit
+    const dailyCount = await getDailyBookingCount(date);
+    if (dailyCount >= DAILY_BOOKING_LIMIT) {
       return res.status(400).json({
         success: false,
-        message:
-          "This time slot is already booked. Please select another time.",
+        message: "This date is fully booked (8/8). Please choose another date.",
       });
     }
 
@@ -163,6 +172,7 @@ export const getAllBookings = async (req, res, next) => {
       .populate("customerId", "phone role")
       .sort({ createdAt: -1 });
 
+    console.log("API Hit");
     res.status(200).json({
       success: true,
       count: bookings.length,
@@ -183,6 +193,7 @@ export const getMyBookings = async (req, res, next) => {
       .populate("customerId", "phone role")
       .sort({ createdAt: -1 });
 
+    console.log("API Hit");
     res.status(200).json({
       success: true,
       count: bookings.length,
@@ -221,6 +232,7 @@ export const getBooking = async (req, res, next) => {
       });
     }
 
+    console.log("API Hit");
     res.status(200).json({
       success: true,
       data: booking,
@@ -261,6 +273,7 @@ export const updateBookingStatus = async (req, res, next) => {
       "phone role",
     );
 
+    console.log("API Hit");
     res.status(200).json({
       success: true,
       message: "Booking status updated successfully",
@@ -287,6 +300,7 @@ export const deleteBooking = async (req, res, next) => {
 
     await booking.deleteOne();
 
+    console.log("API Hit");
     res.status(200).json({
       success: true,
       message: "Booking deleted successfully",
