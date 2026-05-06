@@ -8,12 +8,22 @@ const generateToken = (id) => {
   });
 };
 
+const mapUserProfile = (user) => ({
+  id: user._id,
+  phone: user.phone,
+  firstName: user.firstName || "",
+  lastName: user.lastName || "",
+  gender: user.gender || "prefer_not_to_say",
+  role: user.role,
+});
+
 // @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
 export const register = async (req, res, next) => {
   try {
-    const { phone, password, confirmPassword } = req.body;
+    const { phone, password, confirmPassword, firstName, lastName, gender } =
+      req.body;
 
     // Validation
     if (!phone || !password || !confirmPassword) {
@@ -56,6 +66,9 @@ export const register = async (req, res, next) => {
     // Create user
     const user = await User.create({
       phone,
+      firstName: firstName || "",
+      lastName: lastName || "",
+      gender: gender || "prefer_not_to_say",
       password,
       role: "user",
     });
@@ -75,11 +88,7 @@ export const register = async (req, res, next) => {
       success: true,
       message: "Registration successful",
       data: {
-        user: {
-          id: user._id,
-          phone: user.phone,
-          role: user.role,
-        },
+        user: mapUserProfile(user),
         token, // Send token in response for alternative storage
       },
     });
@@ -138,11 +147,7 @@ export const login = async (req, res, next) => {
       success: true,
       message: "Login successful",
       data: {
-        user: {
-          id: user._id,
-          phone: user.phone,
-          role: user.role,
-        },
+        user: mapUserProfile(user),
         token, // Send token in response for alternative storage
       },
     });
@@ -160,11 +165,7 @@ export const getMe = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: {
-        id: user._id,
-        phone: user.phone,
-        role: user.role,
-      },
+      data: mapUserProfile(user),
     });
   } catch (error) {
     next(error);
@@ -178,17 +179,69 @@ export const updateProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
 
-    // User profile is minimal (phone/role), no updatable fields
-    // Keep endpoint for future use
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const { firstName, lastName, gender, phone } = req.body;
+
+    if (typeof firstName === "string") {
+      user.firstName = firstName.trim();
+    }
+
+    if (typeof lastName === "string") {
+      user.lastName = lastName.trim();
+    }
+
+    if (typeof gender === "string") {
+      const allowedGenders = ["male", "female", "other", "prefer_not_to_say"];
+
+      if (!allowedGenders.includes(gender)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please select a valid gender option",
+        });
+      }
+
+      user.gender = gender;
+    }
+
+    if (typeof phone === "string") {
+      const nextPhone = phone.trim();
+
+      if (nextPhone.length < 10) {
+        return res.status(400).json({
+          success: false,
+          message: "Phone number must be at least 10 digits",
+        });
+      }
+
+      if (nextPhone !== user.phone) {
+        const existingUser = await User.findOne({
+          phone: nextPhone,
+          _id: { $ne: user._id },
+        });
+
+        if (existingUser) {
+          return res.status(400).json({
+            success: false,
+            message: "Phone number already registered",
+          });
+        }
+
+        user.phone = nextPhone;
+      }
+    }
+
+    await user.save();
 
     res.status(200).json({
       success: true,
-      message: "Profile retrieved successfully",
-      data: {
-        id: user._id,
-        phone: user.phone,
-        role: user.role,
-      },
+      message: "Profile updated successfully",
+      data: mapUserProfile(user),
     });
   } catch (error) {
     next(error);

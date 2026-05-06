@@ -10,6 +10,21 @@ const userSchema = new mongoose.Schema(
       trim: true,
       minlength: [10, "Phone number must be at least 10 digits"],
     },
+    firstName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    lastName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    gender: {
+      type: String,
+      enum: ["male", "female", "other", "prefer_not_to_say"],
+      default: "prefer_not_to_say",
+    },
     password: {
       type: String,
       required: [true, "Password is required"],
