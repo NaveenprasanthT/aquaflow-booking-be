@@ -25,7 +25,10 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   "https://aquaflow-booking.vercel.app",
+  "https://aquaflow-booking.onrender.com",
   "https://spotway.vercel.app",
+  "https://spotway.in",
+  "https://www.spotway.in",
 ];
 
 app.use(
