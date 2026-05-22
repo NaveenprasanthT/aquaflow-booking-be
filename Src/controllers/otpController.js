@@ -292,3 +292,108 @@ export const sendAuthOtp = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Verify OTP and complete login or registration
+// @route   POST /api/auth/verify-otp-auth
+// @access  Public
+export const verifyAuthOtp = async (req, res, next) => {
+  try {
+    const phone = normalizePhone(req.body.phone);
+    const otp = String(req.body.otp || "").trim();
+    const purpose = req.body.purpose;
+    const firstName = String(req.body.firstName || "").trim();
+    const lastName = String(req.body.lastName || "").trim();
+
+    if (!phone || !otp || !purpose) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide phone, OTP, and purpose",
+      });
+    }
+
+    if (!["login", "register"].includes(purpose)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid purpose",
+      });
+    }
+
+    const otpDoc = await Otp.findOne({ phone });
+    if (!otpDoc) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired. Please request a new OTP",
+      });
+    }
+
+    if (new Date() > otpDoc.expiresAt) {
+      await Otp.deleteOne({ _id: otpDoc._id });
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired. Please request a new OTP",
+      });
+    }
+
+    if (otpDoc.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP",
+      });
+    }
+
+    await Otp.deleteOne({ _id: otpDoc._id });
+
+    let user;
+
+    if (purpose === "login") {
+      user = await User.findOne({ phone });
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "No account found with this number",
+        });
+      }
+    } else {
+      const existingUser = await User.findOne({ phone });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: "Phone already registered. Please login instead.",
+        });
+      }
+      user = await User.create({
+        phone,
+        firstName: firstName || "",
+        lastName: lastName || "",
+        role: "user",
+      });
+    }
+
+    const token = generateToken(user._id);
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: purpose === "login" ? "Login successful" : "Registration successful",
+      data: {
+        user: {
+          id: user._id,
+          phone: user.phone,
+          firstName: user.firstName || "",
+          lastName: user.lastName || "",
+          gender: user.gender || "prefer_not_to_say",
+          role: user.role,
+        },
+        token,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
