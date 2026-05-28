@@ -85,7 +85,11 @@ export const forgotPassword = async (req, res, next) => {
       { new: true, upsert: true, setDefaultsOnInsert: true },
     );
 
-    await sendOtpViaMsg91({ phone, otp });
+    try {
+      await sendOtpViaMsg91({ phone, otp });
+    } catch (smsError) {
+      console.error(`[MSG91:FAILED] OTP for ${phone} is ${otp} — ${smsError.message}`);
+    }
 
     res.status(200).json({
       success: true,
@@ -281,7 +285,11 @@ export const sendAuthOtp = async (req, res, next) => {
       { new: true, upsert: true, setDefaultsOnInsert: true },
     );
 
-    await sendOtpViaMsg91({ phone, otp });
+    try {
+      await sendOtpViaMsg91({ phone, otp });
+    } catch (smsError) {
+      console.error(`[MSG91:FAILED] OTP for ${phone} is ${otp} — ${smsError.message}`);
+    }
 
     res.status(200).json({
       success: true,
@@ -303,6 +311,7 @@ export const verifyAuthOtp = async (req, res, next) => {
     const purpose = req.body.purpose;
     const firstName = String(req.body.firstName || "").trim();
     const lastName = String(req.body.lastName || "").trim();
+    const gender = String(req.body.gender || "").trim();
 
     if (!phone || !otp || !purpose) {
       return res.status(400).json({
@@ -361,10 +370,14 @@ export const verifyAuthOtp = async (req, res, next) => {
           message: "Phone already registered. Please login instead.",
         });
       }
+      const allowedGenders = ["male", "female", "other", "prefer_not_to_say"];
+      const resolvedGender = allowedGenders.includes(gender) ? gender : "prefer_not_to_say";
+
       user = await User.create({
         phone,
         firstName: firstName || "",
         lastName: lastName || "",
+        gender: resolvedGender,
         role: "user",
       });
     }

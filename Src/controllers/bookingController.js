@@ -1,6 +1,7 @@
 import Booking from "../models/Booking.js";
 import User from "../models/User.js";
 import ServiceItem from "../models/ServiceItem.js";
+import { sendBookingStatusSms, sendTimeSlotSms } from "../services/msg91Service.js";
 
 const DAILY_BOOKING_LIMIT = 8;
 
@@ -20,14 +21,10 @@ const addOnPrices = {
 
 // Calculate total price
 const calculatePrice = async (serviceType, addOns = []) => {
-  const [serviceFor, ...serviceTypeParts] = String(serviceType || "").split(
-    "-",
-  );
-  const rawServiceType = serviceTypeParts.join("-");
-
   const service = await ServiceItem.findOne({
-    serviceFor,
-    serviceType: rawServiceType,
+    $expr: {
+      $eq: [{ $concat: ["$serviceFor", "-", "$serviceType"] }, serviceType],
+    },
     isActive: true,
   });
 
@@ -94,7 +91,7 @@ export const createBooking = async (req, res, next) => {
       req.body;
 
     // Validation
-    if (!serviceType || !address || !date || !timeSlot || !name || !phone) {
+    if (!serviceType || !address || !date || !name || !phone) {
       return res.status(400).json({
         success: false,
         message: "Please provide all required fields",
@@ -242,6 +239,56 @@ export const getBooking = async (req, res, next) => {
   }
 };
 
+// @desc    Assign time slot to booking (admin only)
+// @route   PUT /api/bookings/:id/timeslot
+// @access  Private (Admin)
+export const updateTimeSlot = async (req, res, next) => {
+  try {
+    const { timeSlot } = req.body;
+
+    if (!timeSlot) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a time slot",
+      });
+    }
+
+    const booking = await Booking.findOne({ bookingId: req.params.id });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
+    }
+
+    booking.timeSlot = timeSlot;
+    await booking.save();
+
+    const updatedBooking = await Booking.findById(booking._id).populate(
+      "customerId",
+      "phone role",
+    );
+
+    // Fire-and-forget SMS — never blocks the response
+    sendTimeSlotSms({
+      phone: booking.phone,
+      name:  booking.name,
+      bookingId: booking.bookingId,
+      timeSlot,
+      date: booking.date,
+    }).catch(() => {});
+
+    res.status(200).json({
+      success: true,
+      message: "Time slot assigned successfully",
+      data: updatedBooking,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Update booking status
 // @route   PUT /api/bookings/:id/status
 // @access  Private (Admin)
@@ -272,6 +319,14 @@ export const updateBookingStatus = async (req, res, next) => {
       "customerId",
       "phone role",
     );
+
+    // Fire-and-forget SMS — never blocks the response
+    sendBookingStatusSms({
+      phone: booking.phone,
+      name:  booking.name,
+      bookingId: booking.bookingId,
+      status,
+    }).catch(() => {});
 
     console.log("API Hit");
     res.status(200).json({

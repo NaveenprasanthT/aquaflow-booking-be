@@ -23,6 +23,85 @@ const isPlaceholderConfig = (value) => {
   );
 };
 
+const STATUS_LABELS = {
+  new:          "New / Pending",
+  assigned:     "Confirmed",
+  "in-progress":"Ongoing",
+  completed:    "Completed",
+  cancelled:    "Cancelled",
+};
+
+const sendFlowSms = async ({ templateId, mobile, variables }) => {
+  const authKey = process.env.MSG91_AUTH_KEY;
+  const senderId = process.env.MSG91_SENDER_ID || "AQFLOW";
+
+  if (isPlaceholderConfig(authKey) || isPlaceholderConfig(templateId)) {
+    return { skipped: true };
+  }
+
+  const body = {
+    template_id: templateId,
+    sender: senderId,
+    recipients: [{ mobiles: formatIndianMobile(mobile), ...variables }],
+  };
+
+  const response = await fetch("https://control.msg91.com/api/v5/flow/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      authkey: authKey,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`MSG91 flow failed (${response.status}): ${text}`);
+  }
+  return { skipped: false, response: text };
+};
+
+export const sendBookingStatusSms = async ({ phone, name, bookingId, status }) => {
+  const templateId = process.env.MSG91_STATUS_TEMPLATE_ID;
+  const label = STATUS_LABELS[status] || status;
+
+  if (isPlaceholderConfig(process.env.MSG91_AUTH_KEY) || isPlaceholderConfig(templateId)) {
+    console.warn(`[MSG91:SKIPPED] Status SMS → ${phone} | ${bookingId} → ${label}`);
+    return { skipped: true };
+  }
+
+  try {
+    return await sendFlowSms({
+      templateId,
+      mobile: phone,
+      variables: { name: name || "Customer", booking_id: bookingId, status: label },
+    });
+  } catch (err) {
+    console.error("[MSG91] sendBookingStatusSms error:", err.message);
+    return { skipped: false, error: err.message };
+  }
+};
+
+export const sendTimeSlotSms = async ({ phone, name, bookingId, timeSlot, date }) => {
+  const templateId = process.env.MSG91_TIMESLOT_TEMPLATE_ID;
+
+  if (isPlaceholderConfig(process.env.MSG91_AUTH_KEY) || isPlaceholderConfig(templateId)) {
+    console.warn(`[MSG91:SKIPPED] TimeSlot SMS → ${phone} | ${bookingId} @ ${timeSlot}`);
+    return { skipped: true };
+  }
+
+  try {
+    return await sendFlowSms({
+      templateId,
+      mobile: phone,
+      variables: { name: name || "Customer", booking_id: bookingId, time_slot: timeSlot, date: date || "" },
+    });
+  } catch (err) {
+    console.error("[MSG91] sendTimeSlotSms error:", err.message);
+    return { skipped: false, error: err.message };
+  }
+};
+
 export const sendOtpViaMsg91 = async ({ phone, otp }) => {
   const authKey = process.env.MSG91_AUTH_KEY;
   const templateId = process.env.MSG91_TEMPLATE_ID;
@@ -30,10 +109,6 @@ export const sendOtpViaMsg91 = async ({ phone, otp }) => {
   const otpExpiryMinutes = 5;
 
   if (isPlaceholderConfig(authKey) || isPlaceholderConfig(templateId)) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("MSG91 is not configured");
-    }
-
     console.warn(
       `[MSG91:SKIPPED] Missing MSG91_AUTH_KEY or MSG91_TEMPLATE_ID. OTP for ${phone} is ${otp}`,
     );

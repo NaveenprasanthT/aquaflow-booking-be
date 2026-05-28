@@ -27,7 +27,8 @@
     "jsonwebtoken": "^9.0.2",
     "leaflet": "^1.9.4",
     "mongoose": "^7.6.3",
-    "react-leaflet": "^5.0.0"
+    "react-leaflet": "^5.0.0",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.21",

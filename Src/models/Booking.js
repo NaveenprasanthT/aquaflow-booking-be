@@ -14,7 +14,6 @@ const bookingSchema = new mongoose.Schema(
     serviceType: {
       type: String,
       required: [true, "Service type is required"],
-      enum: ["car-5-seater", "car-7-seater"],
     },
     addOns: [
       {
@@ -33,7 +32,7 @@ const bookingSchema = new mongoose.Schema(
     },
     timeSlot: {
       type: String,
-      required: [true, "Time slot is required"],
+      default: null,
     },
     name: {
       type: String,
@@ -52,7 +51,7 @@ const bookingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["new", "in-progress", "completed"],
+      enum: ["new", "assigned", "in-progress", "completed", "cancelled"],
       default: "new",
     },
     totalPrice: {

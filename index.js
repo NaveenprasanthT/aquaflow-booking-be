@@ -2,7 +2,10 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import { createServer } from "http";
+import { Server } from "socket.io";
 import connectDB from "./Src/config/db.js";
+import { setupSocket } from "./Src/socket/chatSocket.js";
 
 // Load environment variables
 dotenv.config();
@@ -31,22 +34,8 @@ const allowedOrigins = [
   "https://www.spotway.in",
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-);
+app.use(cors());
+app.options("*", cors()); // Enable pre-flight across-the-board
 
 app.use(cookieParser());
 app.use(express.json());
@@ -58,6 +47,7 @@ import adminAuthRoutes from "./Src/routes/adminAuth.js";
 import bookingsRoutes from "./Src/routes/bookings.js";
 import adminRoutes from "./Src/routes/admin.js";
 import servicesRoutes from "./Src/routes/services.js";
+import chatRoutes from "./Src/routes/chat.js";
 
 // Root API endpoint
 app.get("/api", (req, res) => {
@@ -74,6 +64,7 @@ app.use("/api/admin-auth", adminAuthRoutes);
 app.use("/api/bookings", bookingsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/services", servicesRoutes);
+app.use("/api/chat", chatRoutes);
 
 // Health check route
 app.get("/api/health", (req, res) => {
@@ -103,10 +94,22 @@ app.use((req, res) => {
   });
 });
 
+// Create HTTP server and attach Socket.io
+const server = createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    credentials: true,
+  },
+});
+
+setupSocket(io);
+
 // Start Server
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(
     `🚀 Server running on port ${PORT} in ${process.env.NODE_ENV} mode`,
   );
@@ -117,7 +120,6 @@ process.on("unhandledRejection", (err) => {
   console.error("UNHANDLED REJECTION 💥");
   console.error(err.name, err.message);
 
-  // Optional graceful shutdown
   server.close(() => {
     process.exit(1);
   });
