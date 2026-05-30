@@ -12,6 +12,8 @@ import {
   resendOtp,
   verifyOtp,
   resetPassword,
+  sendAuthOtp,
+  verifyAuthOtp,
 } from "../controllers/otpController.js";
 import { protect } from "../middleware/auth.js";
 
@@ -24,5 +26,7 @@ router.post("/forgot-password", forgotPassword);
 router.post("/resend-otp", resendOtp);
 router.post("/verify-otp", verifyOtp);
 router.post("/reset-password", resetPassword);
+router.post("/send-otp", sendAuthOtp);
+router.post("/verify-otp-auth", verifyAuthOtp);
 
 export default router;

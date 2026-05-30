@@ -6,6 +6,7 @@ import {
   getMyBookings,
   getBooking,
   updateBookingStatus,
+  updateTimeSlot,
   deleteBooking,
   getAvailableSlots,
 } from "../controllers/bookingController.js";
@@ -22,6 +23,7 @@ router.get("/", protect, authorize("admin"), getAllBookings);
 router.get("/my", protect, getMyBookings);
 router.get("/:id", protect, getBooking);
 router.put("/:id/status", protect, authorize("admin"), updateBookingStatus);
+router.put("/:id/timeslot", protect, authorize("admin"), updateTimeSlot);
 router.delete("/:id", protect, authorize("admin"), deleteBooking);
 
 export default router;
