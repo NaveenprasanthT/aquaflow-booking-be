@@ -19,20 +19,20 @@ const addOnPrices = {
   "wax-polish": 30,
 };
 
-// Calculate total price
-const calculatePrice = async (serviceType, addOns = []) => {
-  const service = await ServiceItem.findOne({
+// Calculate total price for one or multiple service types
+const calculatePrice = async (serviceTypes, addOns = []) => {
+  const types = Array.isArray(serviceTypes) ? serviceTypes : [serviceTypes];
+
+  const services = await ServiceItem.find({
     $expr: {
-      $eq: [{ $concat: ["$serviceFor", "-", "$serviceType"] }, serviceType],
+      $in: [{ $concat: ["$serviceFor", "-", "$serviceType"] }, types],
     },
     isActive: true,
   });
 
-  if (!service) {
-    return null;
-  }
+  if (services.length === 0) return null;
 
-  let total = service.price;
+  let total = services.reduce((sum, s) => sum + (s.price || 0), 0);
 
   addOns.forEach((addOn) => {
     total += addOnPrices[addOn] || 0;
@@ -87,11 +87,18 @@ export const getAvailableSlots = async (req, res, next) => {
 // @access  Private (must be logged in)
 export const createBooking = async (req, res, next) => {
   try {
-    const { serviceType, addOns, address, date, timeSlot, name, phone, notes } =
+    const { serviceType, serviceTypes, addOns, address, landmark, date, timeSlot, name, phone, notes } =
       req.body;
 
+    // Normalise: accept serviceTypes[] (new) or serviceType string (legacy)
+    const resolvedTypes = Array.isArray(serviceTypes) && serviceTypes.length > 0
+      ? serviceTypes
+      : serviceType
+        ? [serviceType]
+        : [];
+
     // Validation
-    if (!serviceType || !address || !date || !name || !phone) {
+    if (resolvedTypes.length === 0 || !address || !date || !name || !phone) {
       return res.status(400).json({
         success: false,
         message: "Please provide all required fields",
@@ -108,7 +115,7 @@ export const createBooking = async (req, res, next) => {
     }
 
     // Calculate total price using dynamic service pricing
-    const totalPrice = await calculatePrice(serviceType, addOns || []);
+    const totalPrice = await calculatePrice(resolvedTypes, addOns || []);
 
     if (totalPrice === null) {
       return res.status(400).json({
@@ -120,9 +127,11 @@ export const createBooking = async (req, res, next) => {
     // Create booking
     const booking = await Booking.create({
       customerId: req.user ? req.user.id : null,
-      serviceType,
+      serviceType: resolvedTypes[0],
+      serviceTypes: resolvedTypes,
       addOns: addOns || [],
       address,
+      landmark: landmark || "",
       date,
       timeSlot,
       name,

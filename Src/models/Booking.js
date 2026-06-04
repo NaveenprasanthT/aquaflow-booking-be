@@ -13,7 +13,11 @@ const bookingSchema = new mongoose.Schema(
     },
     serviceType: {
       type: String,
-      required: [true, "Service type is required"],
+      default: "",
+    },
+    serviceTypes: {
+      type: [String],
+      default: [],
     },
     addOns: [
       {
@@ -24,6 +28,11 @@ const bookingSchema = new mongoose.Schema(
     address: {
       type: String,
       required: [true, "Address is required"],
+      trim: true,
+    },
+    landmark: {
+      type: String,
+      default: "",
       trim: true,
     },
     date: {
